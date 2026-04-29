@@ -1,4 +1,3 @@
-// حل مشكلة التشفير في بيئة Render
 const crypto = require('crypto');
 if (!global.crypto) {
     global.crypto = crypto;
@@ -7,7 +6,8 @@ if (!global.crypto) {
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
-    DisconnectReason 
+    DisconnectReason,
+    fetchLatestBaileysVersion
 } = require('@whiskeysockets/baileys');
 const express = require('express');
 const pino = require('pino');
@@ -15,36 +15,35 @@ const pino = require('pino');
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// سيرفر ويب بسيط لاستقبال طلبات UptimeRobot
-app.get('/', (req, res) => res.send('WhatsApp Online Service is Running!'));
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+app.get('/', (req, res) => res.send('WhatsApp Online 24/7 is Active!'));
+app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
 
-// الرقم الذي سيتم ربطه
-const phoneNumber = process.env.PHONE || "12892446642"; 
+const phoneNumber = "12892446642"; 
 
-async function connectToWhatsApp() {
-    // إنشاء مجلد auth_info لحفظ الجلسة
+async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+    const { version } = await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
+        version,
         auth: state,
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        browser: ["Beko-Online", "Chrome", "1.0.0"]
+        browser: ["Ubuntu", "Chrome", "20.0.04"]
     });
 
-    // طلب كود الربط في حالة عدم وجود جلسة نشطة
     if (!sock.authState.creds.registered) {
+        // تأخير 10 ثواني قبل طلب الكود لضمان استقرار السيرفر
         setTimeout(async () => {
             try {
                 let code = await sock.requestPairingCode(phoneNumber);
-                console.log('---------------------------------------');
-                console.log(`👉 PAIRING CODE: ${code}`);
-                console.log('---------------------------------------');
-            } catch (error) {
-                console.error("Error requesting pairing code:", error);
+                console.log('\n=======================================');
+                console.log(`👉 YOUR PAIRING CODE: ${code}`);
+                console.log('=======================================\n');
+            } catch (err) {
+                console.log("خطأ في طلب الكود، انتظر قليلاً وسيحاول السيرفر مرة أخرى...");
             }
-        }, 5000);
+        }, 10000);
     }
 
     sock.ev.on('creds.update', saveCreds);
@@ -53,16 +52,14 @@ async function connectToWhatsApp() {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
             const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            if (shouldReconnect) connectToWhatsApp();
+            if (shouldReconnect) startBot();
         } else if (connection === 'open') {
-            console.log('✅ Connected! Account is now 24/7 Online.');
-            
-            // إرسال إشارة "متصل" كل 25 ثانية
+            console.log('✅ Connected! Account is Online 24/7');
             setInterval(async () => {
                 await sock.sendPresenceUpdate('available');
-            }, 25000);
+            }, 20000);
         }
     });
 }
 
-connectToWhatsApp();
+startBot();
