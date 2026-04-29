@@ -1,3 +1,9 @@
+// حل مشكلة التشفير في بيئة Render
+const crypto = require('crypto');
+if (!global.crypto) {
+    global.crypto = crypto;
+}
+
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
@@ -9,24 +15,25 @@ const pino = require('pino');
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// Web server to keep the service alive
+// سيرفر ويب بسيط لاستقبال طلبات UptimeRobot
 app.get('/', (req, res) => res.send('WhatsApp Online Service is Running!'));
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
-// User's phone number in international format
-const phoneNumber = "12892446642"; 
+// الرقم الذي سيتم ربطه
+const phoneNumber = process.env.PHONE || "12892446642"; 
 
 async function connectToWhatsApp() {
+    // إنشاء مجلد auth_info لحفظ الجلسة
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
     const sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false, // Disabling QR to use Pairing Code
+        printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
         browser: ["Beko-Online", "Chrome", "1.0.0"]
     });
 
-    // Request Pairing Code if not registered
+    // طلب كود الربط في حالة عدم وجود جلسة نشطة
     if (!sock.authState.creds.registered) {
         setTimeout(async () => {
             try {
@@ -50,7 +57,7 @@ async function connectToWhatsApp() {
         } else if (connection === 'open') {
             console.log('✅ Connected! Account is now 24/7 Online.');
             
-            // Send presence update every 25 seconds
+            // إرسال إشارة "متصل" كل 25 ثانية
             setInterval(async () => {
                 await sock.sendPresenceUpdate('available');
             }, 25000);
